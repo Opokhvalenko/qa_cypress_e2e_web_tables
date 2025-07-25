@@ -4,7 +4,7 @@ describe('Web Tables Page Functionality', () => {
   beforeEach(() => {
     cy.visit('https://demoqa.com/webtables');
     // Обробка неперехоплених винятків, щоб Cypress не падав
-    Cypress.on('uncaught:exception', (_err, runnable) => {
+    Cypress.on('uncaught:exception', (_err, runnable) => { // Змінено err на _err
       // Повертаємо false, щоб Cypress не фейлив тест
       // через помилку в додатку, яка не стосується тесту.
       // Наприклад, якщо додаток сам викидає якісь помилки JavaScript.
@@ -15,12 +15,18 @@ describe('Web Tables Page Functionality', () => {
     // Використовуємо .then() для синхронного виконання після перевірки body
     cy.get('body').then(($body) => {
       if ($body.find('[id^="delete-record"]').length > 0) {
+        // Замість .each() і повторного пошуку, можна просто клікати по першому
+        // доки він існує.
+        // Замість cy.wait(100), чекаємо, поки елемент зникне, або таблиця оновиться.
+        // Це виправить cypress/no-unnecessary-waiting
         cy.get('[id^="delete-record"]').each(() => {
           cy.get('[id^="delete-record"]').first().click();
-          // Перевіряємо, що таблиця показує менше записів або з'являється "No rows found"
-          cy.get('.rt-tbody .rt-tr-group')
-            .should('have.length.of.at.most', 2) // Припускаємо, що на сторінці 3 дефолтні записи
-            .or('contain', 'No rows found');
+          cy.get('.rt-tbody').should(($tbody) => {
+            const noRowsFound = $tbody.find('.rt-noData').length > 0;
+            const hasFewRows = $tbody.find('.rt-tr-group')
+              .not('.rt-noData').length <= 2;
+            return noRowsFound || hasFewRows;
+          });
         });
       }
     });

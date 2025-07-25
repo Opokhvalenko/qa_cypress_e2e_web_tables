@@ -208,9 +208,9 @@ describe('Web Tables Page Functionality', () => {
       .should('not.exist');
   });
 
-  // 5. Видалити всіх працівників (Delete all workers)
+  // 5.1 should delete all workers from the table
   it('5.1 should delete all workers from the table', () => {
-    // Додаємо декілька працівників, щоб було що видаляти
+  // Додаємо декілька працівників, щоб було що видаляти
     cy.addEmployee(
       'DelAll1', 'User1', 'delall1@example.com', '20', '5000', 'A'
     );
@@ -221,40 +221,44 @@ describe('Web Tables Page Functionality', () => {
       'DelAll3', 'User3', 'delall3@example.com', '22', '7000', 'C'
     );
 
-    // Перевіряємо, що в таблиці є записи
+    // Перевіряємо, що в таблиці є записи (мінімум 3, бо ми додали 3 + дефолтні)
     cy.get('.rt-tbody .rt-tr-group').not('.rt-noData')
       .should('have.length.of.at.least', 3);
 
-    // На цій сторінці (demoqa.com) видалення всіх працівників робить їхні рядки порожніми,
-    // а не видаляє рядки повністю. Тому перевірятимемо, що в таблиці немає "реальних" даних.
-    // Зазвичай, є 3 початкові записи, які можна видалити.
-    // Щоб видалити всі, ми клікаємо на іконку видалення, поки вони є.
-    // Видаляємо всі записи, що мають кнопку видалення
-    cy.get('body').then(($body) => {
-      let deleteButtonsCount = $body.find('[id^="delete-record"]')
-        .length;
-      while (deleteButtonsCount > 0) {
-        cy.get('[id^="delete-record"]').first().click();
-        // Після кліку чекаємо, поки DOM оновиться або елемент зникне
-        cy.get('body').then(($bodyAfterClick) => {
-          deleteButtonsCount = $bodyAfterClick.find('[id^="delete-record"]')
-            .length;
-        });
-      }
-    });
+    // Функція для рекурсивного видалення записів
+    const deleteAllRecords = () => {
+    // Отримуємо поточну кількість кнопок видалення
+      cy.get('body').then(($body) => {
+        const currentDeleteButtons = $body.find('[id^="delete-record"]');
+        const currentCount = currentDeleteButtons.length;
 
-    // Після видалення всіх, у таблиці можуть залишитися порожні рядки (плейсхолдери)
-    // Перевіряємо, що немає жодного запису, який не є порожнім
-    cy.get('.rt-tbody .rt-tr-group').each(($row) => {
-      // Перевіряємо, що всі клітинки в рядку порожні або містять &nbsp;
-      cy.wrap($row).find('.rt-td').each(($cell) => {
-        cy.wrap($cell).invoke('text').then((text) => {
-          expect(text.trim()).to.be.oneOf(['', '\u00A0']); // '' для порожнього, '\u00A0' для &nbsp;
-        });
+        if (currentCount > 0) { // Якщо є кнопки видалення
+          currentDeleteButtons.first().click(); // Клікаємо по першій
+
+          // Після кліку, очікуємо, що кількість кнопок зменшиться на 1
+          cy.get('[id^="delete-record"]')
+            .should('have.length', currentCount - 1)
+            .then(() => {
+            // Рекурсивний виклик для наступного видалення
+              deleteAllRecords();
+            });
+        } else {
+        // Якщо кнопок більше немає, перевіряємо, що таблиця порожня
+          cy.get('.rt-noData').should('be.visible');
+          // Перевірка на порожні комірки, якщо потрібно
+          cy.get('.rt-tbody .rt-tr-group').each(($row) => {
+            cy.wrap($row).find('.rt-td').each(($cell) => {
+              cy.wrap($cell).invoke('text').then((text) => {
+                expect(text.trim()).to.be.oneOf(['', '\u00A0']);
+              });
+            });
+          });
+        }
       });
-    });
-    // Також, якщо з'являється "No rows found"
-    cy.get('.rt-noData').should('be.visible');
+    };
+
+    // Викликаємо функцію для початку видалення
+    deleteAllRecords();
   });
 
   // 6. Знайти працівника в полі пошуку та відредагувати його
